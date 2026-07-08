@@ -57,6 +57,33 @@ function formatDate(str) {
   return `${d}/${m}/${y}`;
 }
 
+// Returns { date, maxWeight, sets } of the last time the exercise was done before `beforeDate`
+function getLastSession(data, exerciseName, beforeDate) {
+  const dates = Object.keys(data).filter(d => d < beforeDate).sort((a, b) => b.localeCompare(a));
+  for (const date of dates) {
+    const ex = data[date].exercises?.find(e => e.name === exerciseName);
+    if (ex && ex.sets?.length) {
+      const maxWeight = Math.max(...ex.sets.map(s => parseFloat(s.weight) || 0));
+      return { date, maxWeight: maxWeight > 0 ? maxWeight : null, sets: ex.sets };
+    }
+  }
+  return null;
+}
+
+// Returns array of { date, maxWeight } for charting
+function getProgressHistory(data, exerciseName) {
+  return Object.keys(data)
+    .sort((a, b) => a.localeCompare(b))
+    .map(date => {
+      const ex = data[date].exercises?.find(e => e.name === exerciseName);
+      if (!ex) return null;
+      const maxWeight = Math.max(...ex.sets.map(s => parseFloat(s.weight) || 0));
+      const totalReps = ex.sets.reduce((n, s) => n + (parseInt(s.reps) || 0), 0);
+      return maxWeight > 0 ? { date, maxWeight, totalReps } : null;
+    })
+    .filter(Boolean);
+}
+
 export default function GymTracker() {
   const [data, setData] = useState({});
   const [view, setView] = useState("today");
@@ -67,6 +94,7 @@ export default function GymTracker() {
   const [customName, setCustomName] = useState("");
   const [customGroup, setCustomGroup] = useState("Pecho");
   const [notification, setNotification] = useState(null);
+  const [progressEx, setProgressEx] = useState(null); // exercise name for chart modal
 
   useEffect(() => { setData(loadData()); }, []);
 
@@ -242,6 +270,8 @@ export default function GymTracker() {
             session.exercises.map((ex, exIdx) => {
               const color = GROUP_COLORS[ex.group] || "#888";
               const isCardio = ex.group === "Cardio";
+              const last = !isCardio ? getLastSession(data, ex.name, selectedDate) : null;
+              const history = !isCardio ? getProgressHistory(data, ex.name) : [];
               return (
                 <div key={exIdx} style={{
                   borderLeft: `2px solid ${color}`, paddingLeft: 14,
@@ -250,12 +280,28 @@ export default function GymTracker() {
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
                     <div>
                       <div style={{ fontSize: 14, fontWeight: 700 }}>{ex.name}</div>
-                      <div style={{ fontSize: 9, letterSpacing: 3, color, marginTop: 2 }}>{(ex.group || "").toUpperCase()}</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 3 }}>
+                        <span style={{ fontSize: 9, letterSpacing: 3, color }}>{(ex.group || "").toUpperCase()}</span>
+                        {last?.maxWeight && (
+                          <span style={{ fontSize: 10, color: "#555" }}>
+                            última vez: <span style={{ color: "#888" }}>{last.maxWeight}kg</span>
+                            <span style={{ color: "#383838" }}> ({formatDate(last.date)})</span>
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <button onClick={() => removeExercise(exIdx)} style={{
-                      background: "none", border: "none", color: "#2a2a2a",
-                      fontSize: 20, cursor: "pointer", lineHeight: 1, padding: "0 2px"
-                    }}>×</button>
+                    <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                      {history.length > 1 && (
+                        <button onClick={() => setProgressEx(ex.name)} style={{
+                          background: "none", border: "none", color: "#333",
+                          fontSize: 14, cursor: "pointer", lineHeight: 1, padding: "0 4px"
+                        }} title="Ver progreso">📈</button>
+                      )}
+                      <button onClick={() => removeExercise(exIdx)} style={{
+                        background: "none", border: "none", color: "#2a2a2a",
+                        fontSize: 20, cursor: "pointer", lineHeight: 1, padding: "0 2px"
+                      }}>×</button>
+                    </div>
                   </div>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
@@ -350,18 +396,23 @@ export default function GymTracker() {
 
                 {/* Exercise list for selected group */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                  {(EXERCISES_BY_GROUP[filterGroup] || []).map(name => (
-                    <button key={name} onClick={() => addExercise(name, filterGroup)} style={{
-                      background: "#0d0d0d", border: "none", color: "#bbb",
-                      fontFamily: "inherit", fontSize: 12, padding: "11px 12px",
-                      textAlign: "left", cursor: "pointer", borderRadius: 1,
-                      display: "flex", justifyContent: "space-between", alignItems: "center",
-                      borderLeft: `2px solid ${GROUP_COLORS[filterGroup]}`
-                    }}>
-                      <span>{name}</span>
-                      <span style={{ fontSize: 12, color: GROUP_COLORS[filterGroup], opacity: 0.5 }}>+</span>
-                    </button>
-                  ))}
+                  {(EXERCISES_BY_GROUP[filterGroup] || []).map(name => {
+                    const last = getLastSession(data, name, selectedDate);
+                    return (
+                      <button key={name} onClick={() => addExercise(name, filterGroup)} style={{
+                        background: "#0d0d0d", border: "none", color: "#bbb",
+                        fontFamily: "inherit", fontSize: 12, padding: "11px 12px",
+                        textAlign: "left", cursor: "pointer", borderRadius: 1,
+                        display: "flex", justifyContent: "space-between", alignItems: "center",
+                        borderLeft: `2px solid ${GROUP_COLORS[filterGroup]}`
+                      }}>
+                        <span>{name}</span>
+                        <span style={{ fontSize: 10, color: "#444", textAlign: "right" }}>
+                          {last?.maxWeight ? `${last.maxWeight}kg` : ""}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </>)}
 
@@ -428,6 +479,32 @@ export default function GymTracker() {
         </div>
       )}
 
+      {/* ── PROGRESS MODAL ── */}
+      {progressEx && (
+        <div style={{
+          position: "fixed", inset: 0, background: "#000000ee",
+          zIndex: 200, display: "flex", alignItems: "flex-end"
+        }} onClick={() => setProgressEx(null)}>
+          <div style={{
+            width: "100%", maxWidth: 480, margin: "0 auto",
+            background: "#0d0d0d", borderTop: "1px solid #222",
+            padding: "20px 20px 40px",
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+              <div>
+                <div style={{ fontSize: 9, letterSpacing: 3, color: "#444", marginBottom: 4 }}>PROGRESIÓN</div>
+                <div style={{ fontSize: 16, fontWeight: 700 }}>{progressEx}</div>
+              </div>
+              <button onClick={() => setProgressEx(null)} style={{
+                background: "none", border: "none", color: "#444",
+                fontSize: 22, cursor: "pointer", lineHeight: 1
+              }}>×</button>
+            </div>
+            <ProgressChart data={getProgressHistory(data, progressEx)} />
+          </div>
+        </div>
+      )}
+
       {/* ── HISTORY VIEW ── */}
       {view === "history" && (
         <div style={{ padding: "0 20px" }}>
@@ -473,13 +550,17 @@ export default function GymTracker() {
                     {s.exercises.map((ex, i) => {
                       const isCardio = ex.group === "Cardio";
                       const color = GROUP_COLORS[ex.group] || "#555";
+                      const hasHistory = !isCardio && getProgressHistory(data, ex.name).length > 1;
                       return (
                         <div key={i} style={{
                           display: "flex", justifyContent: "space-between",
                           fontSize: 12, color: "#666", marginBottom: 4,
                           paddingLeft: 8, borderLeft: `1px solid ${color}30`
                         }}>
-                          <span>{ex.name}</span>
+                          <span
+                            onClick={hasHistory ? () => setProgressEx(ex.name) : undefined}
+                            style={{ cursor: hasHistory ? "pointer" : "default", color: hasHistory ? "#888" : "#666" }}
+                          >{ex.name}{hasHistory ? " 📈" : ""}</span>
                           <span style={{ color: "#333", fontSize: 11 }}>
                             {isCardio
                               ? ex.sets.map(s => [s.minutes && `${s.minutes}min`, s.km && `${s.km}km`].filter(Boolean).join(" ")).filter(Boolean).join(" / ")
@@ -508,6 +589,89 @@ function Stat({ label, value }) {
     <div>
       <div style={{ fontSize: 18, fontWeight: 700 }}>{value}</div>
       <div style={{ fontSize: 8, color: "#383838", letterSpacing: 2 }}>{label.toUpperCase()}</div>
+    </div>
+  );
+}
+
+function ProgressChart({ data }) {
+  if (!data || data.length < 2) return null;
+  const W = 320, H = 140, PL = 36, PR = 12, PT = 10, PB = 30;
+  const weights = data.map(d => d.maxWeight);
+  const minW = Math.min(...weights);
+  const maxW = Math.max(...weights);
+  const range = maxW - minW || 1;
+  const cW = W - PL - PR;
+  const cH = H - PT - PB;
+
+  const pts = data.map((d, i) => ({
+    x: PL + (i / (data.length - 1)) * cW,
+    y: PT + cH - ((d.maxWeight - minW) / range) * cH,
+    ...d
+  }));
+
+  const pathD = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
+  const areaD = `${pathD} L ${pts[pts.length-1].x} ${PT+cH} L ${pts[0].x} ${PT+cH} Z`;
+
+  // Y axis labels
+  const yLabels = [minW, minW + range/2, maxW].map((v, i) => ({
+    y: PT + cH - (i * cH / 2),
+    label: Math.round(v) + "kg"
+  }));
+
+  // X axis: show first, middle, last date
+  const xLabels = [0, Math.floor((data.length-1)/2), data.length-1].map(i => ({
+    x: PL + (i / (data.length-1)) * cW,
+    label: formatDate(data[i].date).slice(0,5)
+  }));
+
+  return (
+    <div>
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: "block" }}>
+        {/* Grid lines */}
+        {yLabels.map((l, i) => (
+          <line key={i} x1={PL} y1={l.y} x2={W-PR} y2={l.y}
+            stroke="#1a1a1a" strokeWidth="1" />
+        ))}
+        {/* Area fill */}
+        <path d={areaD} fill="#ef444411" />
+        {/* Line */}
+        <path d={pathD} fill="none" stroke="#ef4444" strokeWidth="2" strokeLinejoin="round" />
+        {/* Points */}
+        {pts.map((p, i) => (
+          <circle key={i} cx={p.x} cy={p.y} r="3" fill="#ef4444" />
+        ))}
+        {/* Y labels */}
+        {yLabels.map((l, i) => (
+          <text key={i} x={PL-4} y={l.y+4} textAnchor="end"
+            fontSize="8" fill="#444" fontFamily="Courier New">
+            {l.label}
+          </text>
+        ))}
+        {/* X labels */}
+        {xLabels.map((l, i) => (
+          <text key={i} x={l.x} y={H-4} textAnchor="middle"
+            fontSize="8" fill="#444" fontFamily="Courier New">
+            {l.label}
+          </text>
+        ))}
+      </svg>
+      {/* PR badge */}
+      <div style={{ marginTop: 12, display: "flex", gap: 16 }}>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: "#ef4444" }}>{Math.max(...weights)}kg</div>
+          <div style={{ fontSize: 8, letterSpacing: 2, color: "#444" }}>RÉCORD</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 700 }}>{data.length}</div>
+          <div style={{ fontSize: 8, letterSpacing: 2, color: "#444" }}>SESIONES</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: weights[weights.length-1] >= weights[0] ? "#22c55e" : "#ef4444" }}>
+            {weights[weights.length-1] >= weights[0] ? "+" : ""}{Math.round(weights[weights.length-1] - weights[0])}kg
+          </div>
+          <div style={{ fontSize: 8, letterSpacing: 2, color: "#444" }}>PROGRESO</div>
+        </div>
+      </div>
     </div>
   );
 }
