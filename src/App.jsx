@@ -22,6 +22,7 @@ const EXERCISES_BY_GROUP = {
   "Pecho":    ["Press banca", "Press inclinado", "Press declinado", "Aperturas", "Fondos en paralelas", "Crossover"],
   "Hombros":  ["Press militar", "Elevaciones laterales", "Elevaciones frontales", "Pájaros", "Press Arnold"],
   "Espalda":  ["Remo con barra", "Remo con mancuerna", "Dominadas", "Jalón al pecho", "Peso muerto", "Remo en polea"],
+  "Piernas":  ["Sentadilla", "Prensa", "Extensión de cuádriceps", "Curl femoral", "Hip thrust", "Zancadas", "Peso muerto rumano", "Gemelos en máquina"],
   "Bíceps":   ["Curl de bíceps", "Curl martillo", "Curl en polea", "Curl concentrado"],
   "Tríceps":  ["Press francés", "Extensión de tríceps", "Fondos en banco", "Tríceps en polea"],
   "Core":     ["Plancha", "Crunch", "Elevación de piernas", "Rueda abdominal", "Oblicuos"],
@@ -175,6 +176,38 @@ export default function GymTracker() {
     notify("Sesión eliminada");
   }
 
+  function exportData() {
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `gimnasio-${todayStr()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    notify("Exportado ✓");
+  }
+
+  function importData(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const imported = JSON.parse(ev.target.result);
+        if (typeof imported !== "object" || Array.isArray(imported)) throw new Error();
+        const merged = { ...data, ...imported };
+        setData(merged);
+        saveData(merged);
+        notify(`Importado: ${Object.keys(imported).length} sesiones ✓`);
+      } catch {
+        notify("Error al leer el archivo");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  }
+
   const session = getSession(selectedDate);
   const sortedDates = Object.keys(data).sort((a, b) => b.localeCompare(a));
   const totalVolume = session.exercises.reduce((sum, ex) =>
@@ -203,8 +236,23 @@ export default function GymTracker() {
           <div style={{ fontSize: 9, letterSpacing: 4, color: "#444", marginBottom: 3 }}>DIARIO DE</div>
           <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: -1 }}>ENTRENAMIENTO</div>
         </div>
-        <div style={{ fontSize: 11, color: "#444", textAlign: "right" }}>
-          {formatDate(todayStr())}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+          <div style={{ fontSize: 11, color: "#444" }}>{formatDate(todayStr())}</div>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button onClick={exportData} style={{
+              background: "none", border: "1px solid #1e1e1e", color: "#555",
+              fontFamily: "inherit", fontSize: 8, letterSpacing: 2,
+              padding: "4px 8px", cursor: "pointer", borderRadius: 1
+            }}>EXPORTAR</button>
+            <label style={{
+              border: "1px solid #1e1e1e", color: "#555",
+              fontFamily: "inherit", fontSize: 8, letterSpacing: 2,
+              padding: "4px 8px", cursor: "pointer", borderRadius: 1
+            }}>
+              IMPORTAR
+              <input type="file" accept=".json" onChange={importData} style={{ display: "none" }} />
+            </label>
+          </div>
         </div>
       </div>
 
