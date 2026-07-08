@@ -90,9 +90,9 @@ export default function GymTracker() {
   const [selectedDate, setSelectedDate] = useState(todayStr());
   const [showAddExercise, setShowAddExercise] = useState(false);
   const [addTab, setAddTab] = useState("list"); // "list" | "custom"
-  const [filterGroup, setFilterGroup] = useState("Pecho");
+  const [filterGroup, setFilterGroup] = useState("Piernas");
   const [customName, setCustomName] = useState("");
-  const [customGroup, setCustomGroup] = useState("Pecho");
+  const [customGroup, setCustomGroup] = useState("Piernas");
   const [notification, setNotification] = useState(null);
   const [progressEx, setProgressEx] = useState(null); // exercise name for chart modal
 
