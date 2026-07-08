@@ -22,7 +22,6 @@ const EXERCISES_BY_GROUP = {
   "Pecho":    ["Press banca", "Press inclinado", "Press declinado", "Aperturas", "Fondos en paralelas", "Crossover"],
   "Hombros":  ["Press militar", "Elevaciones laterales", "Elevaciones frontales", "Pájaros", "Press Arnold"],
   "Espalda":  ["Remo con barra", "Remo con mancuerna", "Dominadas", "Jalón al pecho", "Peso muerto", "Remo en polea"],
-  "Piernas":  ["Sentadilla", "Prensa", "Extensión de cuádriceps", "Curl femoral", "Hip thrust", "Zancadas", "Peso muerto rumano", "Gemelos en máquina"],
   "Bíceps":   ["Curl de bíceps", "Curl martillo", "Curl en polea", "Curl concentrado"],
   "Tríceps":  ["Press francés", "Extensión de tríceps", "Fondos en banco", "Tríceps en polea"],
   "Core":     ["Plancha", "Crunch", "Elevación de piernas", "Rueda abdominal", "Oblicuos"],
