@@ -94,7 +94,8 @@ export default function GymTracker() {
   const [customName, setCustomName] = useState("");
   const [customGroup, setCustomGroup] = useState("Piernas");
   const [notification, setNotification] = useState(null);
-  const [progressEx, setProgressEx] = useState(null); // exercise name for chart modal
+  const [progressEx, setProgressEx] = useState(null);
+  const [collapsedEx, setCollapsedEx] = useState({}); // exercise name for chart modal
 
   useEffect(() => { setData(loadData()); }, []);
 
@@ -319,17 +320,32 @@ export default function GymTracker() {
               const isCardio = ex.group === "Cardio";
               const last = !isCardio ? getLastSession(data, ex.name, selectedDate) : null;
               const history = !isCardio ? getProgressHistory(data, ex.name) : [];
+              const collapsed = collapsedEx[exIdx];
+              // Summary of sets for collapsed view
+              const setSummary = !isCardio
+                ? ex.sets.map(s => [s.weight && `${s.weight}kg`, s.reps && `×${s.reps}`].filter(Boolean).join("")).filter(Boolean).join("  ")
+                : ex.sets.map(s => [s.minutes && `${s.minutes}min`, s.km && `${s.km}km`].filter(Boolean).join(" ")).filter(Boolean).join("  ");
               return (
                 <div key={exIdx} style={{
                   borderLeft: `2px solid ${color}`, paddingLeft: 14,
-                  marginBottom: 22, paddingTop: 2
+                  marginBottom: 14, paddingTop: 2
                 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-                    <div>
-                      <div style={{ fontSize: 14, fontWeight: 700 }}>{ex.name}</div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 3 }}>
+                  {/* Header row — always visible, click to collapse */}
+                  <div
+                    onClick={() => setCollapsedEx(prev => ({ ...prev, [exIdx]: !prev[exIdx] }))}
+                    style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: collapsed ? 0 : 10, cursor: "pointer" }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ fontSize: 14, fontWeight: 700 }}>{ex.name}</span>
+                        <span style={{ fontSize: 10, color: "#555", lineHeight: 1 }}>{collapsed ? "▶" : "▼"}</span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 3, flexWrap: "wrap" }}>
                         <span style={{ fontSize: 9, letterSpacing: 3, color }}>{(ex.group || "").toUpperCase()}</span>
-                        {last?.maxWeight && (
+                        {collapsed && setSummary && (
+                          <span style={{ fontSize: 10, color: "#888" }}>{setSummary}</span>
+                        )}
+                        {!collapsed && last?.maxWeight && (
                           <span style={{ fontSize: 10, color: "#aaa" }}>
                             última vez: <span style={{ color: "#888" }}>{last.maxWeight}kg</span>
                             <span style={{ color: "#777" }}> ({formatDate(last.date)})</span>
@@ -337,12 +353,12 @@ export default function GymTracker() {
                         )}
                       </div>
                     </div>
-                    <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                    <div style={{ display: "flex", gap: 4, alignItems: "center" }} onClick={e => e.stopPropagation()}>
                       {history.length > 1 && (
                         <button onClick={() => setProgressEx(ex.name)} style={{
                           background: "none", border: "none", color: "#777",
                           fontSize: 14, cursor: "pointer", lineHeight: 1, padding: "0 4px"
-                        }} title="Ver progreso">📈</button>
+                        }}>📈</button>
                       )}
                       <button onClick={() => removeExercise(exIdx)} style={{
                         background: "none", border: "none", color: "#666",
@@ -351,32 +367,34 @@ export default function GymTracker() {
                     </div>
                   </div>
 
-                  <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                    {ex.sets.map((set, setIdx) => (
-                      <div key={setIdx} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontSize: 10, color: "#777", width: 18, textAlign: "right" }}>{setIdx + 1}</span>
-                        {isCardio ? (<>
-                          <NumInput value={set.minutes} onChange={v => updateSet(exIdx, setIdx, "minutes", v)} placeholder="min" suffix="min" />
-                          <NumInput value={set.km} onChange={v => updateSet(exIdx, setIdx, "km", v)} placeholder="km" suffix="km" />
-                        </>) : (<>
-                          <NumInput value={set.weight} onChange={v => updateSet(exIdx, setIdx, "weight", v)} placeholder="kg" suffix="kg" />
-                          <NumInput value={set.reps} onChange={v => updateSet(exIdx, setIdx, "reps", v)} placeholder="reps" suffix="×" suffixBefore />
-                        </>)}
-                        {ex.sets.length > 1 && (
-                          <button onClick={() => removeSet(exIdx, setIdx)} style={{
-                            background: "none", border: "none", color: "#aaa",
-                            fontSize: 18, cursor: "pointer", lineHeight: 1, padding: 0
-                          }}>−</button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-
-                  <button onClick={() => addSet(exIdx)} style={{
-                    marginTop: 8, background: "none", border: "1px solid #333",
-                    color: "#999", fontFamily: "inherit", fontSize: 9, letterSpacing: 2,
-                    padding: "5px 12px", cursor: "pointer", borderRadius: 1
-                  }}>+ SERIE</button>
+                  {/* Collapsible body */}
+                  {!collapsed && (<>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                      {ex.sets.map((set, setIdx) => (
+                        <div key={setIdx} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 10, color: "#777", width: 18, textAlign: "right" }}>{setIdx + 1}</span>
+                          {isCardio ? (<>
+                            <NumInput value={set.minutes} onChange={v => updateSet(exIdx, setIdx, "minutes", v)} placeholder="min" suffix="min" />
+                            <NumInput value={set.km} onChange={v => updateSet(exIdx, setIdx, "km", v)} placeholder="km" suffix="km" />
+                          </>) : (<>
+                            <NumInput value={set.weight} onChange={v => updateSet(exIdx, setIdx, "weight", v)} placeholder="kg" suffix="kg" />
+                            <NumInput value={set.reps} onChange={v => updateSet(exIdx, setIdx, "reps", v)} placeholder="reps" suffix="×" suffixBefore />
+                          </>)}
+                          {ex.sets.length > 1 && (
+                            <button onClick={() => removeSet(exIdx, setIdx)} style={{
+                              background: "none", border: "none", color: "#aaa",
+                              fontSize: 18, cursor: "pointer", lineHeight: 1, padding: 0
+                            }}>−</button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <button onClick={() => addSet(exIdx)} style={{
+                      marginTop: 8, background: "none", border: "1px solid #333",
+                      color: "#999", fontFamily: "inherit", fontSize: 9, letterSpacing: 2,
+                      padding: "5px 12px", cursor: "pointer", borderRadius: 1
+                    }}>+ SERIE</button>
+                  </>)}
                 </div>
               );
             })
@@ -594,29 +612,37 @@ export default function GymTracker() {
                     </div>
 
                     {/* Exercise summary */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {s.exercises.map((ex, i) => {
                       const isCardio = ex.group === "Cardio";
                       const color = GROUP_COLORS[ex.group] || "#555";
                       const hasHistory = !isCardio && getProgressHistory(data, ex.name).length > 1;
+                      const sets = isCardio
+                        ? ex.sets.map(s => [s.minutes && `${s.minutes}min`, s.km && `${s.km}km`].filter(Boolean).join(" ")).filter(Boolean)
+                        : ex.sets.map(s => [s.weight && `${s.weight}kg`, s.reps && `×${s.reps}`].filter(Boolean).join("")).filter(Boolean);
                       return (
                         <div key={i} style={{
-                          display: "flex", justifyContent: "space-between",
-                          fontSize: 12, color: "#aaa", marginBottom: 4,
-                          paddingLeft: 8, borderLeft: `1px solid ${color}30`
+                          paddingLeft: 10, borderLeft: `2px solid ${color}44`
                         }}>
-                          <span
-                            onClick={hasHistory ? () => setProgressEx(ex.name) : undefined}
-                            style={{ cursor: hasHistory ? "pointer" : "default", color: hasHistory ? "#888" : "#666" }}
-                          >{ex.name}{hasHistory ? " 📈" : ""}</span>
-                          <span style={{ color: "#777", fontSize: 11 }}>
-                            {isCardio
-                              ? ex.sets.map(s => [s.minutes && `${s.minutes}min`, s.km && `${s.km}km`].filter(Boolean).join(" ")).filter(Boolean).join(" / ")
-                              : ex.sets.map(s => [s.weight && `${s.weight}kg`, s.reps && `×${s.reps}`].filter(Boolean).join("")).filter(Boolean).join(" / ")
-                            }
-                          </span>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                            <span
+                              onClick={hasHistory ? () => setProgressEx(ex.name) : undefined}
+                              style={{ fontSize: 13, fontWeight: 600, color: "#ddd", cursor: hasHistory ? "pointer" : "default" }}
+                            >{ex.name}{hasHistory ? " 📈" : ""}</span>
+                            <span style={{ fontSize: 8, letterSpacing: 2, color }}>{(ex.group||"").toUpperCase()}</span>
+                          </div>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                            {sets.map((s, si) => (
+                              <span key={si} style={{
+                                fontSize: 11, color: "#999", background: "#1a1a1a",
+                                padding: "2px 7px", borderRadius: 2
+                              }}>{si+1}. {s}</span>
+                            ))}
+                          </div>
                         </div>
                       );
                     })}
+                    </div>
                     {s.notes && (
                       <div style={{ marginTop: 8, fontSize: 11, color: "#888", fontStyle: "italic" }}>{s.notes}</div>
                     )}
