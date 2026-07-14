@@ -90,12 +90,13 @@ export default function GymTracker() {
   const [selectedDate, setSelectedDate] = useState(todayStr());
   const [showAddExercise, setShowAddExercise] = useState(false);
   const [addTab, setAddTab] = useState("list"); // "list" | "custom"
-  const [filterGroup, setFilterGroup] = useState("Piernas");
+  const [filterGroup, setFilterGroup] = useState("Pecho");
   const [customName, setCustomName] = useState("");
-  const [customGroup, setCustomGroup] = useState("Piernas");
+  const [customGroup, setCustomGroup] = useState("Pecho");
   const [notification, setNotification] = useState(null);
   const [progressEx, setProgressEx] = useState(null);
-  const [collapsedEx, setCollapsedEx] = useState({}); // exercise name for chart modal
+  const [collapsedEx, setCollapsedEx] = useState({});
+  const [collapsedHistory, setCollapsedHistory] = useState({}); // exercise name for chart modal
 
   useEffect(() => { setData(loadData()); }, []);
 
@@ -585,67 +586,75 @@ export default function GymTracker() {
                 const vol = s.exercises.reduce((sum, ex) =>
                   sum + ex.sets.reduce((ss, set) =>
                     (set.weight && set.reps) ? ss + parseFloat(set.weight) * parseInt(set.reps) : ss, 0), 0);
+                const collapsed = collapsedHistory[date];
                 return (
                   <div key={date} style={{ borderBottom: "1px solid #2a2a2a", paddingBottom: 16, marginBottom: 16 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                    {/* Clickable header */}
+                    <div
+                      onClick={() => setCollapsedHistory(prev => ({ ...prev, [date]: !prev[date] }))}
+                      style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: collapsed ? 0 : 8, cursor: "pointer" }}
+                    >
                       <div>
-                        <div style={{ fontSize: 16, fontWeight: 700 }}>{formatDate(date)}</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 16, fontWeight: 700 }}>{formatDate(date)}</span>
+                          <span style={{ fontSize: 10, color: "#555" }}>{collapsed ? "▶" : "▼"}</span>
+                        </div>
                         <div style={{ fontSize: 9, color: "#777", marginTop: 2, letterSpacing: 2 }}>
                           {s.exercises.length} EJERC · {s.exercises.reduce((n, e) => n + e.sets.length, 0)} SERIES
                           {vol > 0 && ` · ${Math.round(vol).toLocaleString()} KG`}
                         </div>
                       </div>
-                      <button onClick={() => deleteSession(date)} style={{
+                      <button onClick={e => { e.stopPropagation(); deleteSession(date); }} style={{
                         background: "none", border: "none", color: "#777",
                         fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1
                       }}>×</button>
                     </div>
 
-                    {/* Group tags */}
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 10 }}>
-                      {groups.map(g => (
-                        <span key={g} style={{
-                          fontSize: 8, letterSpacing: 2, padding: "2px 8px",
-                          background: "#1a1a1a", color: GROUP_COLORS[g] || "#555", borderRadius: 1
-                        }}>{g.toUpperCase()}</span>
-                      ))}
-                    </div>
+                    {!collapsed && (<>
+                      {/* Group tags */}
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 10 }}>
+                        {groups.map(g => (
+                          <span key={g} style={{
+                            fontSize: 8, letterSpacing: 2, padding: "2px 8px",
+                            background: "#1a1a1a", color: GROUP_COLORS[g] || "#555", borderRadius: 1
+                          }}>{g.toUpperCase()}</span>
+                        ))}
+                      </div>
 
-                    {/* Exercise summary */}
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {s.exercises.map((ex, i) => {
-                      const isCardio = ex.group === "Cardio";
-                      const color = GROUP_COLORS[ex.group] || "#555";
-                      const hasHistory = !isCardio && getProgressHistory(data, ex.name).length > 1;
-                      const sets = isCardio
-                        ? ex.sets.map(s => [s.minutes && `${s.minutes}min`, s.km && `${s.km}km`].filter(Boolean).join(" ")).filter(Boolean)
-                        : ex.sets.map(s => [s.weight && `${s.weight}kg`, s.reps && `×${s.reps}`].filter(Boolean).join("")).filter(Boolean);
-                      return (
-                        <div key={i} style={{
-                          paddingLeft: 10, borderLeft: `2px solid ${color}44`
-                        }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
-                            <span
-                              onClick={hasHistory ? () => setProgressEx(ex.name) : undefined}
-                              style={{ fontSize: 13, fontWeight: 600, color: "#ddd", cursor: hasHistory ? "pointer" : "default" }}
-                            >{ex.name}{hasHistory ? " 📈" : ""}</span>
-                            <span style={{ fontSize: 8, letterSpacing: 2, color }}>{(ex.group||"").toUpperCase()}</span>
+                      {/* Exercise summary */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {s.exercises.map((ex, i) => {
+                        const isCardio = ex.group === "Cardio";
+                        const color = GROUP_COLORS[ex.group] || "#555";
+                        const hasHistory = !isCardio && getProgressHistory(data, ex.name).length > 1;
+                        const sets = isCardio
+                          ? ex.sets.map(s => [s.minutes && `${s.minutes}min`, s.km && `${s.km}km`].filter(Boolean).join(" ")).filter(Boolean)
+                          : ex.sets.map(s => [s.weight && `${s.weight}kg`, s.reps && `×${s.reps}`].filter(Boolean).join("")).filter(Boolean);
+                        return (
+                          <div key={i} style={{ paddingLeft: 10, borderLeft: `2px solid ${color}44` }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                              <span
+                                onClick={hasHistory ? () => setProgressEx(ex.name) : undefined}
+                                style={{ fontSize: 13, fontWeight: 600, color: "#ddd", cursor: hasHistory ? "pointer" : "default" }}
+                              >{ex.name}{hasHistory ? " 📈" : ""}</span>
+                              <span style={{ fontSize: 8, letterSpacing: 2, color }}>{(ex.group||"").toUpperCase()}</span>
+                            </div>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                              {sets.map((s, si) => (
+                                <span key={si} style={{
+                                  fontSize: 11, color: "#999", background: "#1a1a1a",
+                                  padding: "2px 7px", borderRadius: 2
+                                }}>{si+1}. {s}</span>
+                              ))}
+                            </div>
                           </div>
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                            {sets.map((s, si) => (
-                              <span key={si} style={{
-                                fontSize: 11, color: "#999", background: "#1a1a1a",
-                                padding: "2px 7px", borderRadius: 2
-                              }}>{si+1}. {s}</span>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })}
-                    </div>
-                    {s.notes && (
-                      <div style={{ marginTop: 8, fontSize: 11, color: "#888", fontStyle: "italic" }}>{s.notes}</div>
-                    )}
+                        );
+                      })}
+                      </div>
+                      {s.notes && (
+                        <div style={{ marginTop: 8, fontSize: 11, color: "#888", fontStyle: "italic" }}>{s.notes}</div>
+                      )}
+                    </>)}
                   </div>
                 );
               })}
